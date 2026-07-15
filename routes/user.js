@@ -7,6 +7,7 @@ const { authenticateToken } = require("./userAuth")
 const Carrier = require('../models/CarrierData');  // Import the Carrier model
 const ContactForm = require('../models/contactData.js');
 const Contact = require('../models/ContactModel.js');
+const SiteSettings = require('../models/SiteSettings.js');
 // models\contactData.js
 // POST route to save the carrier data
 const express = require('express');
@@ -145,15 +146,16 @@ router.post('/CarrierData', upload.fields([
 ]), async (req, res) => {
     try {
         const carrierData = JSON.parse(req.body.carrierData); // Parse the JSON string from FormData
-        const { MCAuthFile, COLFile, W9File, NOVFile } = req.files;
+        const files = req.files || {};
 
-        // Create a new carrier instance with file paths
+        // All four documents (MC Authority, COI, W9, NOA) are OPTIONAL.
+        // If a file was not uploaded, we simply store "None" for that field.
         const carrier = new Carrier({
             ...carrierData,
-            MCAuthFile: MCAuthFile[0].path, // Store the file path
-            COLFile: COLFile[0].path,
-            W9File: W9File[0].path,
-            NOVFile: NOVFile[0].path
+            MCAuthFile: files.MCAuthFile?.[0]?.path || "None",
+            COLFile: files.COLFile?.[0]?.path || "None",
+            W9File: files.W9File?.[0]?.path || "None",
+            NOVFile: files.NOVFile?.[0]?.path || "None"
         });
 
         // Save the carrier data to the database
@@ -277,6 +279,39 @@ router.delete('/deleteCarrier/:id', authenticateToken, async (req, res) => {
 
 });
 
+
+// ------------------- SITE SETTINGS (dynamic phone / email / address) -------------------
+
+// Public: read the current contact information (creates defaults on first call)
+router.get('/site-settings', async (req, res) => {
+    try {
+        let settings = await SiteSettings.findOne();
+        if (!settings) {
+            settings = await SiteSettings.create({});
+        }
+        res.status(200).json(settings);
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching site settings", error: error.message });
+    }
+});
+
+// Admin only: update phone, email and address
+router.put('/site-settings', authenticateToken, async (req, res) => {
+    try {
+        const { phone, email, address } = req.body;
+        let settings = await SiteSettings.findOne();
+        if (!settings) {
+            settings = new SiteSettings({});
+        }
+        if (phone !== undefined) settings.phone = phone;
+        if (email !== undefined) settings.email = email;
+        if (address !== undefined) settings.address = address;
+        await settings.save();
+        res.status(200).json({ message: "Site settings updated successfully", settings });
+    } catch (error) {
+        res.status(500).json({ message: "Error updating site settings", error: error.message });
+    }
+});
 
 router.delete('/deleteContact/:id', authenticateToken, async (req, res) => {
     try {
