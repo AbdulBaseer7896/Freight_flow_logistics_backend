@@ -15,8 +15,8 @@ const app = express();
 // app.use(cors());
 app.use(cors({
   // origin: ['https://freightflowsolutions.co','https://dispatchingllc.netlify.app' , 'https://freightflowlogistics.netlify.app'], // Your React app's origin
-  // origin: 'https://freightflowlogistics.netlify.app', // Your React app's origin
-  origin: 'http://localhost:3000', // Your React app's origin
+  origin: 'https://freightflowlogistics.netlify.app', // Your React app's origin
+  // origin: 'http://localhost:3000', // Your React app's origin
   // credentials: true
 }));
 
