@@ -26,10 +26,10 @@ load_dotenv()
 import os
 SECRET_KEY = os.getenv('SECRET_KEY', 'fallback-secret-if-missing')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = []
+_allowed_hosts_raw = os.getenv('ALLOWED_HOSTS', '*')
+ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_raw.split(',') if h.strip()]
 
 
 # Application definition
