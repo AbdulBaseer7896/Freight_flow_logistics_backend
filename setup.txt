@@ -1,0 +1,89 @@
+============================================================
+FREIGHT FLOW BACKEND - SERVER SETUP GUIDE
+============================================================
+
+1. INSTALL POSTGRESQL & SYSTEM DEPENDENCIES
+------------------------------------------------------------
+sudo apt update
+sudo apt install -y postgresql postgresql-contrib libpq-dev python3-pip python3-venv
+
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+
+2. CREATE DATABASE & USER
+------------------------------------------------------------
+sudo -u postgres psql
+
+-- Inside psql:
+CREATE DATABASE freight_db;
+CREATE USER freight_user WITH PASSWORD 'YourStrongPassword123!';
+ALTER ROLE freight_user SET client_encoding TO 'utf8';
+ALTER ROLE freight_user SET default_transaction_isolation TO 'read committed';
+ALTER ROLE freight_user SET timezone TO 'UTC';
+GRANT ALL PRIVILEGES ON DATABASE freight_db TO freight_user;
+ALTER DATABASE freight_db OWNER TO freight_user;
+\c freight_db
+GRANT ALL ON SCHEMA public TO freight_user;
+\q
+
+
+3. PYTHON VIRTUAL ENVIRONMENT & PACKAGES
+------------------------------------------------------------
+cd /path/to/Freight_flow_logistics_backend
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+
+4. CONFIGURE .ENV
+------------------------------------------------------------
+nano .env
+
+# Put the following inside .env:
+SECRET_KEY=your-secret-key-here
+ENVIRONMENT=production
+DATABASE_URL=postgresql://freight_user:YourStrongPassword123!@127.0.0.1:5432/freight_db
+CORS_ALLOWED_ORIGINS=https://your-frontend-domain.com
+
+
+5. RUN MIGRATIONS & CREATE ADMIN
+------------------------------------------------------------
+python manage.py migrate
+python manage.py createsuperuser
+
+
+6. CREATE SYSTEMD SERVICE (FOR BACKGROUND AUTO-START)
+------------------------------------------------------------
+sudo nano /etc/systemd/system/freightflow.service
+
+# Paste the following into the service file:
+# (Note: Replace "/path/to" and "your_user" with your actual server paths and linux username)
+[Unit]
+Description=Freight Flow Backend Gunicorn Daemon
+After=network.target postgresql.service
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/path/to/Freight_flow_logistics_backend
+ExecStart=/path/to/Freight_flow_logistics_backend/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 backend.wsgi:application
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+
+
+7. START & ENABLE THE SERVICE
+------------------------------------------------------------
+sudo systemctl daemon-reload
+sudo systemctl start freightflow
+sudo systemctl enable freightflow
+
+# Check service status:
+sudo systemctl status freightflow
+
+# View logs:
+journalctl -u freightflow -f
