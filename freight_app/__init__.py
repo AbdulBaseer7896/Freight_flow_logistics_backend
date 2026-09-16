@@ -1,0 +1,1 @@
+# freight_app module
