@@ -17,27 +17,12 @@ class MCNumberView(APIView):
         except Exception as e:
             return Response({'error': 'Server Error', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-import threading
-
-_highway_session = requests.Session()
-_session_lock = threading.Lock()
-_highway_headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
-    'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Referer': 'https://highway.com/',
-    'Origin': 'https://highway.com',
-}
-
-def _warmup_highway_session(force=False):
-    """Visits highway.com home page to acquire valid CloudFront / session cookies."""
-    with _session_lock:
-        if force or not _highway_session.cookies:
-            try:
-                _highway_session.headers.update(_highway_headers)
-                _highway_session.get('https://highway.com', timeout=10)
-            except Exception:
-                pass
+try:
+    from curl_cffi import requests as cffi_requests
+    HAS_CURL_CFFI = True
+except ImportError:
+    import requests as cffi_requests
+    HAS_CURL_CFFI = False
 
 class MCLookupView(APIView):
     permission_classes = [AllowAny]
@@ -47,18 +32,19 @@ class MCLookupView(APIView):
             return Response({'error': 'Invalid MC number format'}, status=status.HTTP_400_BAD_REQUEST)
         
         api_url = f"https://highway.com/monitor/api/v1/carriers/by_identifier?is_type=MC&value={mcNumber}"
-        
-        # Ensure session has valid CloudFront cookies
-        _warmup_highway_session()
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://highway.com/',
+        }
 
         try:
-            response = _highway_session.get(api_url, headers=_highway_headers, timeout=12)
+            req_kwargs = {'headers': headers, 'timeout': 15}
+            if HAS_CURL_CFFI:
+                req_kwargs['impersonate'] = 'chrome124'
             
-            # If CloudFront blocked due to stale session, refresh cookies and retry once
-            if response.status_code == 403:
-                _warmup_highway_session(force=True)
-                response = _highway_session.get(api_url, headers=_highway_headers, timeout=12)
-
+            response = cffi_requests.get(api_url, **req_kwargs)
             response.raise_for_status()
             carrier_data = response.json()
             
@@ -84,18 +70,17 @@ class MCLookupView(APIView):
                 'Email': email
             }
             return Response(formatted_data)
-        except requests.exceptions.RequestException as e:
-            status_code = e.response.status_code if e.response is not None else status.HTTP_500_INTERNAL_SERVER_ERROR
+        except Exception as e:
             error_details = str(e)
-            if e.response is not None:
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+            if hasattr(e, 'response') and e.response is not None:
+                status_code = e.response.status_code
                 try:
                     error_details = e.response.json().get('error', str(e))
-                except ValueError:
+                except Exception:
                     error_details = e.response.text or str(e)
             
             return Response({
                 'error': 'Failed to fetch carrier data',
                 'details': error_details
             }, status=status_code)
-        except Exception as e:
-            return Response({'error': 'Failed to fetch carrier data', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
