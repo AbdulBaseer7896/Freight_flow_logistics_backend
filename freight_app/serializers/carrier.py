@@ -13,6 +13,10 @@ class CarrierDataSerializer(serializers.ModelSerializer):
     USDOT_Number = serializers.CharField(required=True)
     Physical_Address = serializers.CharField(required=True)
     
+    # Optional fields
+    plan = serializers.CharField(required=False, allow_blank=True, default="None")
+    signature = serializers.CharField(required=False, allow_blank=True, default="None")
+    
     # Optional files and fields
     MCAuthFile = serializers.FileField(required=False, allow_null=True)
     COLFile = serializers.FileField(required=False, allow_null=True)

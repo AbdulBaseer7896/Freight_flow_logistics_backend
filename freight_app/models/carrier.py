@@ -11,8 +11,8 @@ class CarrierData(models.Model):
     Phone = models.CharField(max_length=100, default="None")
     USDOT_Number = models.CharField(max_length=100, default="None")
     Physical_Address = models.TextField(default="None")
-    plan = models.CharField(max_length=100, default="None")
-    signature = models.CharField(max_length=255, default="None")
+    plan = models.CharField(max_length=100, default="None", blank=True, null=True)
+    signature = models.CharField(max_length=255, default="None", blank=True, null=True)
     
     MCAuthFile = models.FileField(upload_to='carriers/', null=True, blank=True)
     COLFile = models.FileField(upload_to='carriers/', null=True, blank=True)
