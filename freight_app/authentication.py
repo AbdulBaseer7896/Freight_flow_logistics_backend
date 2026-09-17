@@ -9,11 +9,16 @@ class EmailOrUsernameModelBackend(ModelBackend):
         if username is None:
             username = kwargs.get(User.USERNAME_FIELD)
         
-        try:
-            # Allow login via username or email
-            user = User.objects.get(Q(username__iexact=username) | Q(email__iexact=username))
-        except User.DoesNotExist:
-            User().set_password(password) # Run the default password hasher to mitigate timing attacks
+        if not username or not password:
+            return None
+
+        # Allow login via username or email (case-insensitive)
+        user = User.objects.filter(
+            Q(username__iexact=username) | Q(email__iexact=username)
+        ).first()
+
+        if user is None:
+            User().set_password(password) # Mitigate timing attacks
             return None
             
         if user.check_password(password) and self.user_can_authenticate(user):
