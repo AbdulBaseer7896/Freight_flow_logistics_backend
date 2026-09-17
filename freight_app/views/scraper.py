@@ -24,6 +24,37 @@ except ImportError:
     import requests as cffi_requests
     HAS_CURL_CFFI = False
 
+def _fetch_carrier_from_highway(mc_number):
+    """Fetches carrier data from Highway using a warm browser session to pass CloudFront WAF."""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
+
+    if HAS_CURL_CFFI:
+        session = cffi_requests.Session(impersonate='chrome124')
+    else:
+        session = requests.Session()
+
+    session.headers.update(headers)
+    
+    # 1. Warm up session by visiting the home page (establishes CloudFront cookies)
+    try:
+        session.get('https://highway.com', timeout=15)
+    except Exception:
+        pass
+
+    # 2. Query the carrier endpoint with appropriate referer and headers
+    api_url = f"https://highway.com/monitor/api/v1/carriers/by_identifier?is_type=MC&value={mc_number}"
+    api_headers = {
+        'Referer': 'https://highway.com/',
+        'Accept': 'application/json, text/plain, */*',
+    }
+    
+    response = session.get(api_url, headers=api_headers, timeout=15)
+    response.raise_for_status()
+    return response.json()
+
 class MCLookupView(APIView):
     permission_classes = [AllowAny]
 
@@ -31,22 +62,8 @@ class MCLookupView(APIView):
         if not mcNumber.isdigit():
             return Response({'error': 'Invalid MC number format'}, status=status.HTTP_400_BAD_REQUEST)
         
-        api_url = f"https://highway.com/monitor/api/v1/carriers/by_identifier?is_type=MC&value={mcNumber}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://highway.com/',
-        }
-
         try:
-            req_kwargs = {'headers': headers, 'timeout': 15}
-            if HAS_CURL_CFFI:
-                req_kwargs['impersonate'] = 'chrome124'
-            
-            response = cffi_requests.get(api_url, **req_kwargs)
-            response.raise_for_status()
-            carrier_data = response.json()
+            carrier_data = _fetch_carrier_from_highway(mcNumber)
             
             physical = carrier_data.get('physical_address', {})
             address_parts = [physical.get('street1'), physical.get('city'), physical.get('state'), physical.get('postal_code')]
