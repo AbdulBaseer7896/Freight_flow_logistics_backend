@@ -26,6 +26,24 @@ except ImportError:
 
 import os
 
+def _format_proxy_url(proxy_str):
+    """Converts various proxy formats (host:port:user:pass, user:pass@host:port, etc.) to a standard URL."""
+    if not proxy_str or not str(proxy_str).strip():
+        return None
+    raw = str(proxy_str).strip()
+    if '://' in raw:
+        return raw
+    if '@' in raw:
+        return f'http://{raw}'
+    parts = raw.split(':')
+    if len(parts) == 4:
+        host, port, user, pwd = parts
+        return f'http://{user}:{pwd}@{host}:{port}'
+    elif len(parts) == 2:
+        host, port = parts
+        return f'http://{host}:{port}'
+    return f'http://{raw}'
+
 def _fetch_carrier_from_highway(mc_number):
     """Fetches carrier data from Highway using a warm browser session to pass CloudFront WAF."""
     headers = {
@@ -33,8 +51,9 @@ def _fetch_carrier_from_highway(mc_number):
         'Accept-Language': 'en-US,en;q=0.9',
     }
 
-    proxy = os.getenv('SCRAPER_PROXY') or os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY')
-    proxies = {'http': proxy, 'https': proxy} if proxy else None
+    raw_proxy = os.getenv('SCRAPER_PROXY') or os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY')
+    proxy_url = _format_proxy_url(raw_proxy)
+    proxies = {'http': proxy_url, 'https': proxy_url} if proxy_url else None
 
     if HAS_CURL_CFFI:
         session = cffi_requests.Session(impersonate='chrome124')
@@ -58,7 +77,7 @@ def _fetch_carrier_from_highway(mc_number):
         'Accept': 'application/json, text/plain, */*',
     }
     
-    response = session.get(api_url, headers=api_headers, timeout=15)
+    response = session.get(api_url, headers=api_headers, timeout=20)
     response.raise_for_status()
     return response.json()
 
