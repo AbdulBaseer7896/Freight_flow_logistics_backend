@@ -24,6 +24,8 @@ except ImportError:
     import requests as cffi_requests
     HAS_CURL_CFFI = False
 
+import os
+
 def _fetch_carrier_from_highway(mc_number):
     """Fetches carrier data from Highway using a warm browser session to pass CloudFront WAF."""
     headers = {
@@ -31,12 +33,17 @@ def _fetch_carrier_from_highway(mc_number):
         'Accept-Language': 'en-US,en;q=0.9',
     }
 
+    proxy = os.getenv('SCRAPER_PROXY') or os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY')
+    proxies = {'http': proxy, 'https': proxy} if proxy else None
+
     if HAS_CURL_CFFI:
         session = cffi_requests.Session(impersonate='chrome124')
     else:
         session = requests.Session()
 
     session.headers.update(headers)
+    if proxies:
+        session.proxies = proxies
     
     # 1. Warm up session by visiting the home page (establishes CloudFront cookies)
     try:
@@ -88,15 +95,8 @@ class MCLookupView(APIView):
             }
             return Response(formatted_data)
         except Exception as e:
-            error_details = str(e)
-            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            if hasattr(e, 'response') and e.response is not None:
-                status_code = e.response.status_code
-                try:
-                    error_details = e.response.json().get('error', str(e))
-                except Exception:
-                    error_details = e.response.text or str(e)
-            
+            error_details = "Carrier lookup service is temporarily blocked or unavailable for this IP. Please enter details manually."
+            status_code = status.HTTP_404_NOT_FOUND
             return Response({
                 'error': 'Failed to fetch carrier data',
                 'details': error_details
