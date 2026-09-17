@@ -17,34 +17,48 @@ class MCNumberView(APIView):
         except Exception as e:
             return Response({'error': 'Server Error', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+import threading
+
+_highway_session = requests.Session()
+_session_lock = threading.Lock()
+_highway_headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://highway.com/',
+    'Origin': 'https://highway.com',
+}
+
+def _warmup_highway_session(force=False):
+    """Visits highway.com home page to acquire valid CloudFront / session cookies."""
+    with _session_lock:
+        if force or not _highway_session.cookies:
+            try:
+                _highway_session.headers.update(_highway_headers)
+                _highway_session.get('https://highway.com', timeout=10)
+            except Exception:
+                pass
+
 class MCLookupView(APIView):
     permission_classes = [AllowAny]
+
     def get(self, request, mcNumber):
         if not mcNumber.isdigit():
             return Response({'error': 'Invalid MC number format'}, status=status.HTTP_400_BAD_REQUEST)
         
         api_url = f"https://highway.com/monitor/api/v1/carriers/by_identifier?is_type=MC&value={mcNumber}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/html, application/xhtml+xml, application/xml',
-            'Accept-Encoding': 'gzip, deflate, br, zstd',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Cache-Control': 'no-cache',
-            'Referer': 'https://highway.com/',
-            'Priority': 'u=0, i',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'same-origin',
-            'Upgrade-Insecure-Requests': '1'
-        }
         
-        # Forward cookies if the frontend provided any
-        client_cookie = request.headers.get('Cookie')
-        if client_cookie:
-            headers['Cookie'] = client_cookie
-        
+        # Ensure session has valid CloudFront cookies
+        _warmup_highway_session()
+
         try:
-            response = requests.get(api_url, headers=headers)
+            response = _highway_session.get(api_url, headers=_highway_headers, timeout=12)
+            
+            # If CloudFront blocked due to stale session, refresh cookies and retry once
+            if response.status_code == 403:
+                _warmup_highway_session(force=True)
+                response = _highway_session.get(api_url, headers=_highway_headers, timeout=12)
+
             response.raise_for_status()
             carrier_data = response.json()
             
@@ -52,7 +66,7 @@ class MCLookupView(APIView):
             address_parts = [physical.get('street1'), physical.get('city'), physical.get('state'), physical.get('postal_code')]
             address = ", ".join(filter(bool, address_parts))
             
-            mc_val = next((id.get('value') for id in carrier_data.get('identifiers', []) if id.get('is_type') == 'MC'), 'N/A')
+            mc_val = next((id.get('value') for id in carrier_data.get('identifiers', []) if id.get('is_type') == 'MC'), mcNumber)
             dot_val = next((id.get('value') for id in carrier_data.get('identifiers', []) if id.get('is_type') == 'DOT'), 'N/A')
             
             phones = carrier_data.get('phones') or []
