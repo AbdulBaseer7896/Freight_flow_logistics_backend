@@ -100,6 +100,14 @@ sudo nano /etc/nginx/sites-available/freightflow
 # (Replace 178-128-148-182.sslip.io with your actual domain or IP hostname)
 server {
     server_name 178-128-148-182.sslip.io;
+    client_max_body_size 50M;
+
+    location /uploads/ {
+        alias /opt/Freight_flow_logistics_backend/uploads/;
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+        add_header Access-Control-Allow-Origin *;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:8000;
