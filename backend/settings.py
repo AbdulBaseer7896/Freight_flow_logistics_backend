@@ -136,20 +136,8 @@ REST_FRAMEWORK = {
     ),
 }
 
-# CORS Configuration
-_cors_origins_raw = os.getenv('CORS_ALLOWED_ORIGINS', '')
-if _cors_origins_raw.strip() and _cors_origins_raw.strip() != '*':
-    CORS_ALLOW_ALL_ORIGINS = False
-    _origins = []
-    for origin in _cors_origins_raw.split(','):
-        origin = origin.strip()
-        if origin:
-            if not origin.startswith(('http://', 'https://')):
-                origin = f'https://{origin}'
-            _origins.append(origin)
-    CORS_ALLOWED_ORIGINS = _origins
-else:
-    CORS_ALLOW_ALL_ORIGINS = True
+# CORS Configuration — allow all origins so local dev & production work smoothly
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
