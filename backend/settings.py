@@ -136,22 +136,41 @@ REST_FRAMEWORK = {
     ),
 }
 
-# CORS — reads a comma-separated list from CORS_ALLOWED_ORIGINS in .env.
-# Example: CORS_ALLOWED_ORIGINS=https://app.freightflow.com,https://admin.freightflow.com
+# CORS Configuration
 _cors_origins_raw = os.getenv('CORS_ALLOWED_ORIGINS', '')
-if _cors_origins_raw.strip():
+if _cors_origins_raw.strip() and _cors_origins_raw.strip() != '*':
     CORS_ALLOW_ALL_ORIGINS = False
     _origins = []
     for origin in _cors_origins_raw.split(','):
         origin = origin.strip()
         if origin:
             if not origin.startswith(('http://', 'https://')):
-                origin = f'http://{origin}'
+                origin = f'https://{origin}'
             _origins.append(origin)
     CORS_ALLOWED_ORIGINS = _origins
 else:
-    # No origins configured — allow all (safe for local dev; set CORS_ALLOWED_ORIGINS in prod!)
     CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
