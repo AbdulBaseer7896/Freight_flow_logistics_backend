@@ -141,7 +141,14 @@ REST_FRAMEWORK = {
 _cors_origins_raw = os.getenv('CORS_ALLOWED_ORIGINS', '')
 if _cors_origins_raw.strip():
     CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_origins_raw.split(',') if origin.strip()]
+    _origins = []
+    for origin in _cors_origins_raw.split(','):
+        origin = origin.strip()
+        if origin:
+            if not origin.startswith(('http://', 'https://')):
+                origin = f'http://{origin}'
+            _origins.append(origin)
+    CORS_ALLOWED_ORIGINS = _origins
 else:
     # No origins configured — allow all (safe for local dev; set CORS_ALLOWED_ORIGINS in prod!)
     CORS_ALLOW_ALL_ORIGINS = True
