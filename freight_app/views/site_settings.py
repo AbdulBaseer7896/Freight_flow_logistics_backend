@@ -6,10 +6,7 @@ from freight_app.serializers import SiteSettingsSerializer
 from freight_app.models import SiteSettings
 
 class SiteSettingsView(APIView):
-    def get_permissions(self):
-        if self.request.method == 'PUT':
-            return [IsAuthenticated()]
-        return [AllowAny()]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         settings = SiteSettings.objects.first()
@@ -17,7 +14,7 @@ class SiteSettingsView(APIView):
             settings = SiteSettings.objects.create()
         return Response(SiteSettingsSerializer(settings).data)
 
-    def put(self, request):
+    def _save(self, request):
         settings = SiteSettings.objects.first()
         if not settings:
             settings = SiteSettings.objects.create()
@@ -26,3 +23,12 @@ class SiteSettingsView(APIView):
             serializer.save()
             return Response({'message': 'Site settings updated successfully', 'settings': serializer.data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request):
+        return self._save(request)
+
+    def put(self, request):
+        return self._save(request)
+
+    def patch(self, request):
+        return self._save(request)

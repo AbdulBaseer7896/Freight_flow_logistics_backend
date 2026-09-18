@@ -2,9 +2,9 @@ from rest_framework import serializers
 from freight_app.models import SiteSettings
 
 class SiteSettingsSerializer(serializers.ModelSerializer):
-    phone = serializers.CharField(required=True)
-    email = serializers.EmailField(required=True)
-    address = serializers.CharField(required=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.CharField(required=False, allow_blank=True)
+    address = serializers.CharField(required=False, allow_blank=True)
     
     class Meta:
         model = SiteSettings
